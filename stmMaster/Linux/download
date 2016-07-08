@@ -1,0 +1,3 @@
+#!/bin/bash
+sudo /home/asantos/dev/stlink/st-flash write stmUsbMaster.bin 0x8000000
+

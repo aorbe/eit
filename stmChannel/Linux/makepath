@@ -1,0 +1,6 @@
+#!/bin/bash
+
+export PATH=$PATH:/home/asantos/dev/gcc-arm-none-eabi-4_9-2015q1/bin
+
+make clean
+make $1
