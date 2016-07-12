@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Supervisor" />
+		<Option pch_mode="2" />
+		<Option default_target="Release" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/Supervisor" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="`wx-config --cflags`" />
+				</Compiler>
+				<Linker>
+					<Add option="`wx-config --libs`" />
+					<Add library="/lib/x86_64-linux-gnu/libusb-1.0.so.0" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/Supervisor" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="`wx-config --cflags `" />
+				</Compiler>
+				<Linker>
+					<Add option="`wx-config --libs`" />
+					<Add library="/lib/x86_64-linux-gnu/libusb-1.0.so.0" />
+				</Linker>
+			</Target>
+			<Target title="Linux32">
+				<Option output="bin/Linux32/Supervisor" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Linux32/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="`wx-config --cflags`" />
+				</Compiler>
+				<Linker>
+					<Add option="`wx-config --libs`" />
+					<Add library="/usr/lib/libusb-1.0.so.0" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-DSQLITE_THREADSAFE=1" />
+		</Compiler>
+		<Linker>
+			<Add library="dl" />
+			<Add library="/usr/lib/x86_64-linux-gnu/libglut.a" />
+		</Linker>
+		<Unit filename="ChSerialPort.cpp" />
+		<Unit filename="ChSerialPort.h" />
+		<Unit filename="ChSimPort.cpp" />
+		<Unit filename="ChSimPort.h" />
+		<Unit filename="ChUsbPort.cpp" />
+		<Unit filename="ChUsbPort.h" />
+		<Unit filename="ICommChannel.h" />
+		<Unit filename="IMain.h" />
+		<Unit filename="IProtocol.h" />
+		<Unit filename="IStorage.h" />
+		<Unit filename="ProtBasicBus.cpp" />
+		<Unit filename="ProtBasicBus.h" />
+		<Unit filename="ProtModbus.cpp" />
+		<Unit filename="ProtModbus.h" />
+		<Unit filename="Record.cpp" />
+		<Unit filename="Record.h" />
+		<Unit filename="Scan.cpp" />
+		<Unit filename="Scan.h" />
+		<Unit filename="StDatabase.cpp" />
+		<Unit filename="StDatabase.h" />
+		<Unit filename="Supervisor.cpp" />
+		<Unit filename="Supervisor.h" />
+		<Unit filename="Voltage.h" />
+		<Unit filename="WAnalyse.cpp">
+			<Option compile="0" />
+			<Option link="0" />
+		</Unit>
+		<Unit filename="WAnalyse.h" />
+		<Unit filename="WConfig.cpp" />
+		<Unit filename="WConfig.h" />
+		<Unit filename="WMain.cpp" />
+		<Unit filename="WMain.h" />
+		<Unit filename="WMonitor.cpp" />
+		<Unit filename="WMonitor.h" />
+		<Unit filename="WRun.cpp" />
+		<Unit filename="WRun.h" />
+		<Unit filename="math/mathplot.cpp" />
+		<Unit filename="math/mathplot.h" />
+		<Unit filename="sqlite/sqlite3.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="sqlite/sqlite3.h" />
+		<Unit filename="sqlite/sqlite3ext.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+			<envvars />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
