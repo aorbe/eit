@@ -5,7 +5,7 @@ LD  = arm-none-eabi-ld -v
 CP  = arm-none-eabi-objcopy
 LDSCRIPT = stm32_flash.ld
 
-FW  := /home/asantos/dev/STM32F4-Discovery
+FW  := /home/asantos/git/eit_code/STM32F4-Discovery
 INC_DISCOVERY := $(FW)/Utilities/STM32F4-Discovery
 SRC_DISCOVERY := $(FW)/Utilities/STM32F4-Discovery
 INC_STD_DRIVER:=$(FW)/Libraries/STM32F4xx_StdPeriph_Driver/inc

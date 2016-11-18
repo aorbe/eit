@@ -3,6 +3,16 @@
  *
  *  Created on: 08/06/2015
  *      Author: asantos
+ *
+ *
+ * I/O
+ * PD12/13/14/15 - LEDs
+ * PA0 - Master sync clock input (125KHz from generator)
+ * PC6 - Master sync clock output (1.6KHz for normal operation and for calibration)
+ * PC8 - Master cycle synchronization (1 transition each 512 sync clock pulses)
+ * PB6 - Tx | UART Communication in 10.5Mbps
+ * PB7 - Rx |
+ *
  */
 
 #include "stm32f4_discovery.h"
@@ -37,29 +47,29 @@ void config(void)
 	// Simulation has no UART communication
 #else
 	InitDMA();
-
 	USART_DMACmd(USART1, USART_DMAReq_Tx | USART_DMAReq_Rx, ENABLE);
 
 	InitTIM2();		// USART Timeout
 #endif
 	InitSyncTimer();
-	InitTIM6();
 }
 
 // Config Blue Button and four LEDs
 void BasicIO_Config(void)
 {
 	GPIO_InitTypeDef GPIO_InitStructureLEDs;
-//	GPIO_InitTypeDef GPIO_InitStructureBTN;
+	GPIO_InitTypeDef GPIO_InitStructureINP;
 	GPIO_InitTypeDef GPIO_InitStructureOC;
 	GPIO_InitTypeDef GPIO_InitStructureUSART;
 
-	/* Configure user button as input */
-//	GPIO_InitStructureBTN.GPIO_Pin		= GPIO_Pin_0;
-//	GPIO_InitStructureBTN.GPIO_Mode		= GPIO_Mode_IN;
-//	GPIO_InitStructureBTN.GPIO_Speed	= GPIO_Speed_2MHz;
-//	GPIO_InitStructureBTN.GPIO_PuPd		= GPIO_PuPd_NOPULL;
-//	GPIO_Init(GPIOA, &GPIO_InitStructureBTN);
+	/* Configure sync input */
+	GPIO_StructInit(&GPIO_InitStructureINP);
+	GPIO_InitStructureINP.GPIO_Pin		= GPIO_Pin_0;
+	GPIO_InitStructureINP.GPIO_Mode		= GPIO_Mode_AF;
+	GPIO_InitStructureINP.GPIO_Speed	= GPIO_Speed_50MHz;
+	GPIO_InitStructureINP.GPIO_PuPd		= GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &GPIO_InitStructureINP);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource0, GPIO_AF_TIM8);
 
 	/* Configure PD12, PD13, PD14 and PD15 in output pushpull mode - LEDs */
 	GPIO_InitStructureLEDs.GPIO_Pin		= GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
@@ -69,24 +79,23 @@ void BasicIO_Config(void)
 	GPIO_InitStructureLEDs.GPIO_PuPd	= GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructureLEDs);
 
-	// Cycle
-	GPIO_InitStructureOC.GPIO_Pin			= GPIO_Pin_8;
-	//GPIO_InitStructureOC.GPIO_Mode			= GPIO_Mode_AF;
-	GPIO_InitStructureOC.GPIO_Mode			= GPIO_Mode_OUT;
-	GPIO_InitStructureOC.GPIO_Speed			= GPIO_Speed_50MHz;
-	GPIO_InitStructureOC.GPIO_OType			= GPIO_OType_PP;
-	GPIO_InitStructureOC.GPIO_PuPd			= GPIO_PuPd_UP;
-	GPIO_Init(GPIOC, &GPIO_InitStructureOC);
-	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_TIM3);
-
-	// SYNC
+	// Cycle - PB8
 	GPIO_InitStructureOC.GPIO_Pin			= GPIO_Pin_8;
 	GPIO_InitStructureOC.GPIO_Mode			= GPIO_Mode_AF;
 	GPIO_InitStructureOC.GPIO_Speed			= GPIO_Speed_50MHz;
 	GPIO_InitStructureOC.GPIO_OType			= GPIO_OType_PP;
 	GPIO_InitStructureOC.GPIO_PuPd			= GPIO_PuPd_UP;
-	GPIO_Init(GPIOA, &GPIO_InitStructureOC);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_TIM1);
+	GPIO_Init(GPIOB, &GPIO_InitStructureOC);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_TIM4);
+
+	// Sync Output (PC6)
+	GPIO_InitStructureOC.GPIO_Pin			= GPIO_Pin_6;
+	GPIO_InitStructureOC.GPIO_Mode			= GPIO_Mode_AF;
+	GPIO_InitStructureOC.GPIO_Speed			= GPIO_Speed_50MHz;
+	GPIO_InitStructureOC.GPIO_OType			= GPIO_OType_PP;
+	GPIO_InitStructureOC.GPIO_PuPd			= GPIO_PuPd_UP;
+	GPIO_Init(GPIOC, &GPIO_InitStructureOC);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
 
 	// Tx Pin - PB6
 	GPIO_InitStructureUSART.GPIO_Pin	= GPIO_Pin_6;
@@ -138,8 +147,8 @@ void InitTIM2()
 }
 
 // Config Timer 3 and 1
-// TIM1 generates main clock signal
-// TIM3 generates sync clock signal
+// TIM8 generates main clock signal
+// TIM4 generates sync clock signal
 void InitSyncTimer()
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -147,83 +156,62 @@ void InitSyncTimer()
 	TIM_BDTRInitTypeDef		TIM_InitStructureBDTR;
 	NVIC_InitTypeDef   		NVIC_InitStructure;
 
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
-	TIM_Cmd(TIM3, DISABLE);
-	TIM_Cmd(TIM1, DISABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
+	TIM_Cmd(TIM4, DISABLE);
+	TIM_Cmd(TIM8, DISABLE);
 
-	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period 		= CAPTURE_SCAN - 1;		// Counts until interrupt generation
-	TIM_TimeBaseStructure.TIM_Prescaler		= 84 - 1;				// 84 MHz Clock down to 1 MHz used above (adjust per your clock)
-	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
-	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
-	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0000;
-	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-
-	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period 		= 511;				// Counts until interrupt generation
-	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				//
-	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
-	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
-	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
-
-	/*
-	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
-	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
-	TIM_InitStructureOC.TIM_Pulse			= 25;
-	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
-	TIM_InitStructureOC.TIM_OCIdleState		= TIM_OCIdleState_Reset;
-	TIM_OC3Init(TIM3, &TIM_InitStructureOC);
-	TIM_CCxCmd(TIM3, TIM_Channel_3, TIM_CCx_Enable);
-	*/
-
-	TIM_OCStructInit(&TIM_InitStructureOC);
-	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
-	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
-	TIM_InitStructureOC.TIM_Pulse			= 250;
-	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
-	TIM_OC1Init(TIM1, &TIM_InitStructureOC);
-	TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Enable);
-
-	TIM_CtrlPWMOutputs(TIM1, ENABLE);
-
-	TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);
-	TIM_SelectMasterSlaveMode(TIM1, TIM_MasterSlaveMode_Enable);
-
-	TIM_SelectInputTrigger(TIM3, TIM_TS_ITR0);
-	TIM_SelectSlaveMode(TIM3, TIM_SlaveMode_External1);
-
-	TIM_Cmd(TIM3, ENABLE);
-	TIM_Cmd(TIM1, ENABLE);
-}
-
-// Config Timer 6
-// Cyclic interrupt after timer expired
-// SCAN_PERIOD (in us)
-void InitTIM6()
-{
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-	NVIC_InitTypeDef   		NVIC_InitStructure;
-
-	/* Enable the TIM6 global Interrupt */
-	NVIC_InitStructure.NVIC_IRQChannel 						= TIM6_DAC_IRQn;
+	/* Enable the TIM8 global Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel 						= TIM8_UP_TIM13_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority 	= 1;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority 			= 1;
 	NVIC_InitStructure.NVIC_IRQChannelCmd 					= ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	/* TIM6 clock enable */
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
+	/* Time base configuration */
+	TIM_TimeBaseStructure.TIM_Period 		= 38;				// Counts until interrupt generation 125/1.6 / 2 (Toogle) -> 38 (Run Mode)
+	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				// This is changed for calibration from 0 to 1023
+	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0000;
+	TIM_TimeBaseInit(TIM8, &TIM_TimeBaseStructure);
+	TIM_ETRClockMode1Config(TIM8, TIM_ExtTRGPSC_OFF, TIM_ExtTRGPolarity_NonInverted, 0);
 
 	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period 			= SCAN_PERIOD - 1; 	// Counts until interrupt generation
-	TIM_TimeBaseStructure.TIM_Prescaler 		= 84 - 1; 	// 42 MHz Clock down to 1 MHz used above (adjust per your clock)
-	TIM_TimeBaseStructure.TIM_ClockDivision 	= 0;
-	TIM_TimeBaseStructure.TIM_CounterMode 		= TIM_CounterMode_Up;
-	TIM_TimeBaseInit(TIM6, &TIM_TimeBaseStructure);
-	TIM_SelectOnePulseMode(TIM6, TIM_OPMode_Repetitive);
+	TIM_TimeBaseStructure.TIM_Period 		= 255;				// Counts until interrupt generation
+	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				//
+	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
 
-	TIM_ITConfig(TIM6, TIM_IT_Update, ENABLE);
+	TIM_OCStructInit(&TIM_InitStructureOC);
+	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
+	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
+	TIM_InitStructureOC.TIM_Pulse			= 127;
+	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
+	TIM_InitStructureOC.TIM_OCIdleState		= TIM_OCIdleState_Reset;
+	TIM_OC3Init(TIM4, &TIM_InitStructureOC);
+	TIM_CCxCmd(TIM4, TIM_Channel_3, TIM_CCx_Enable);
+
+	TIM_OCStructInit(&TIM_InitStructureOC);
+	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
+	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
+	TIM_InitStructureOC.TIM_Pulse			= 35;
+	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
+	TIM_OC1Init(TIM8, &TIM_InitStructureOC);
+	TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Enable);
+	TIM_CtrlPWMOutputs(TIM8, ENABLE);
+
+	TIM_SelectOutputTrigger(TIM8, TIM_TRGOSource_OC1);
+	TIM_SelectMasterSlaveMode(TIM8, TIM_MasterSlaveMode_Enable);
+
+	TIM_SelectInputTrigger(TIM4, TIM_TS_ITR3);
+	TIM_SelectSlaveMode(TIM4, TIM_SlaveMode_External1);
+
+	TIM_ITConfig(TIM8, TIM_IT_Update, ENABLE);
+
+	TIM_Cmd(TIM4, ENABLE);
+	TIM_Cmd(TIM8, ENABLE);
 }
 
 // Config USART1

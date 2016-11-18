@@ -17,7 +17,7 @@
 #define CAPTURE_LEN			1020
 
 #define SERIAL_BAUD			10500000
-#define SLAVE_QTY			16
+#define SLAVE_QTY			9
 
 #define SIZE_RCV_BUFFER		32
 #define SIZE_SND_BUFFER		12
@@ -30,8 +30,8 @@
 
 #define CAPTURE_SCAN		625			// 625us -> 50 image/s @ 32 electrode
 
-#define MAX_FRAMES			16			// 256 / SLAVE_QTY
-#define FRAME_SIZE			170			// 10 * SLAVE_QTY + 10
+#define MAX_FRAMES			32			// 256 / SLAVE_QTY
+#define FRAME_SIZE			90			// 10 * SLAVE_QTY + 10
 
 #define MODE				tx_data[4]
 
@@ -40,6 +40,6 @@
 #define USB_BUFFER_SIZE		20492	// 2^N + 12
 #define USB_BUFFER_INIT		20320	// USB_BUFFER_SIZE - FRAME_SIZE
 #define USB_TRANSF_SIZE		20488
-#define USB_DATA_SIZE		160
+#define USB_DATA_SIZE		80
 
 #endif /* MAIN_H_ */

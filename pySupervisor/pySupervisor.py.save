@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sqlite3
+import time
+from pylab import *
+import pylab
+import numpy as np
+
+print 'Banco de dados (/home/asantos/sqlite3.db):'
+input dbFile
+
+if (
+
+# Cria uma conexão e um cursor
+con = sqlite3.connect('/home/asantos/sqlite3.db')
+cur = con.cursor()
+
+tables = []
+# Tables
+for row in cur.execute("SELECT dataTable FROM CONTROL;"):
+	#print(time.strftime('%d %b %Y %H:%M:%S +0000',time.gmtime(row[0])), ' ', row[7])
+	tables.append(row[0])
+
+for idx, table in enumerate(tables):
+	query = 'SELECT COUNT(*) FROM ' + table + ';'
+	cur.execute(query)
+	lenTable = cur.fetchone();
+	print '%d. Table '%(idx) + table + ' has %d records' %(lenTable)
+
+print('Selecione uma opcao: ')
+sel = input()
+
+result = cur.execute('SELECT * FROM %s ORDER BY ts, id;'%(tables[sel])).fetchall()
+
+ID_POS = 1
+last = [0, result[0][ID_POS]]
+tr = []
+count = 0
+for i, r in enumerate(result[1:]):
+	if (int(r[ID_POS]) != int(result[i][ID_POS])+1):
+		print('Indice %d ERRO %d'%(i, result[i][ID_POS]))
+		tr.append([last, [i-1, result[i][ID_POS]]])
+		count += 1		
+		last = [i, r[ID_POS]]
+
+if (tr == []):
+	print("Already ordened")
+	quit()
+
+for row in tr:
+	print(row)
+
+tr_order = []
+tr_order.append(tr.pop(0))
+
+tam = len(tr)
+while len(tr):
+	
+	for j, nxt in enumerate(tr):
+		if ((tr_order[len(tr_order)-1][1][1] + 1) % 65536 == nxt[0][1]):
+			tr_order.append(tr.pop(j))
+			break
+	if(tam == len(tr)):
+		break
+	tam = len(tr)
+
+
+print('Desordenados: %d'%(len(tr)))
+#for row in tr:
+#	print(row)
+print('Ordenados: %d'%(len(tr_order)))
+d = []
+for row in tr_order:
+	for res in result[row[0][0]:row[1][0]]: 
+		d.append(res)
+
+v = np.asarray(d, dtype=np.float64)
+
+nEletrodo = 2
+
+amp = np.square(np.add(np.multiply(v[:,nEletrodo*3-1],v[:,nEletrodo*3-1]), np.multiply(v[:,nEletrodo*3],v[:,nEletrodo*3-1])))
+
+fase = np.arctan2(v[:,nEletrodo*3], v[:,nEletrodo*3-1])
+pylab.figure(1)
+pylab.plot(amp)
+pylab.figure(2)
+pylab.plot(fase)
+pylab.figure(3)
+pylab.hist(fase,100)
+
+#hist(v[:,2], 100)
+pylab.show()
+
+
+
+# Fecha a conexão
+con.close()

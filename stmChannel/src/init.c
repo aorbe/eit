@@ -10,13 +10,11 @@
 #include "init.h"
 
 extern volatile int16_t data[CAPTURE_LEN];	// Store each AD reading
-//uint32_t ForceCapture = 0;
+extern volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
 
 DMA_InitTypeDef   	DMA_SendStructure;
 DMA_InitTypeDef  	DMA_RecvStructure;
 EXTI_InitTypeDef   	EXTI_InitStructure;
-
-extern volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
 
 void config()
 {
@@ -25,11 +23,10 @@ void config()
 
 	BasicIO_Config();
 
-	//ForceCapture = EXTI->IMR | EXTI_Line1;
-	InitUSART();
-	InitDMA();
-	InitTimeout();
-	InitSyncTimer();
+	InitUSART();				// UART1 are used (PB6/PB7)
+	InitDMA();					// Communication uses DMA
+	InitTimeout();				// Communication timeout
+	InitSyncTimer();			// Counting of cycles
 	InitExtInterrupt();			// DAV and Sync Interrupts
 
 #ifdef DMA_RECEPTION
@@ -52,6 +49,12 @@ void BasicIO_Config()
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 
+	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_7;
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_UP;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
 	/* Configure Port E as input for 16 bit data from ADC					*/
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_All;
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
@@ -66,13 +69,6 @@ void BasicIO_Config()
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	/* Configure PA02 (OTR) as input  */
-	//GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_2;
-	//GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
-	//GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_25MHz;
-	//GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
-	//GPIO_Init(GPIOA, &GPIO_InitStructure);
-
 	/* Configure PA03 (OTR) as input  */
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_3;
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
@@ -80,22 +76,22 @@ void BasicIO_Config()
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	/* Configure PC08 (Cycle - TIM8 CH3) as input  */
-	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_8;
-	//GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF;
+	/* Configure PA00 (Sync - TIM8 ETR) as input  */
+	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_0;
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF;
+	//GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_25MHz;
+	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource0, GPIO_AF_TIM8);
+
+	/* Configure PC06 (Cycle/Reset - TIM8_CH1) as input  */
+	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_6;
 	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_25MHz;
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_TIM8);
-
-	/* Configure PC06 (Sync - TIM8_CH1) as input  */
-	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_6;
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_25MHz;
-	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
+	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
 
 	// Tx Pin - PB6
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_6;
@@ -122,13 +118,12 @@ void BasicIO_Config()
 void InitExtInterrupt()
 {
 	NVIC_InitTypeDef   	NVIC_InitStructure;
-
 	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA, EXTI_PinSource1);
 
 	/* Configure EXTI Line1 */
 	EXTI_InitStructure.EXTI_Line = EXTI_Line1;
 	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
 	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
 	EXTI_Init(&EXTI_InitStructure);
 
@@ -164,7 +159,7 @@ void InitTimeout()
 	 * USART in 3.5Mbps, transfering 10 bytes (10 bits per byte sent, totalizing 100 bits or 35Kpackages/s)
 	 *
 	 */
-	TIM_TimeBaseStructure.TIM_Period		= 80; // RCV_TIMEOUT - 1; // Counts until interrupt generation
+	TIM_TimeBaseStructure.TIM_Period		= 180; // RCV_TIMEOUT - 1; // Counts until interrupt generation
 	TIM_TimeBaseStructure.TIM_Prescaler		= 42 - 1; // 42 MHz Clock down to 1 MHz used above (adjust per your clock)
 	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
 	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
@@ -177,34 +172,17 @@ void InitTimeout()
 }
 
 // SyncTimer is TIM8
+// which counter value (0-255) is used as sample identifier
 void InitSyncTimer()
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 	TIM_ICInitTypeDef		TIM_ICInitStructure;
 	NVIC_InitTypeDef   		NVIC_InitStructure;
 
-	/* */
-	TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-	TIM_TimeBaseStructure.TIM_Period		= 255;
-	TIM_TimeBaseStructure.TIM_Prescaler		= 0;
-	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
-	TIM_TimeBaseInit(TIM8, &TIM_TimeBaseStructure);
+	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource6);
 
-	TIM_TIxExternalClockConfig(TIM8, TIM_TIxExternalCLK1Source_TI1, TIM_ICPolarity_Rising, 0);
-
-	/*
-	TIM_ICInitStructure.TIM_Channel				= TIM_Channel_3;
-	TIM_ICInitStructure.TIM_ICFilter			= 0x00;
-	TIM_ICInitStructure.TIM_ICPolarity			= TIM_ICPolarity_BothEdge;
-	TIM_ICInitStructure.TIM_ICPrescaler			= TIM_ICPSC_DIV1;
-	TIM_ICInitStructure.TIM_ICSelection			= TIM_ICSelection_DirectTI;
-	TIM_ICInit(TIM8, &TIM_ICInitStructure);
-	*/
-
-	SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource8);
-
-	/* Configure EXTI Line8 */
-	EXTI_InitStructure.EXTI_Line = EXTI_Line8;
+	/* Configure EXTI Line6 for cycle syncronization */
+	EXTI_InitStructure.EXTI_Line = EXTI_Line6;
 	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
 	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
 	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
@@ -217,6 +195,15 @@ void InitSyncTimer()
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
+	/* Increase each sync pulse (1.6kHz in RUN mode) */
+	TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+	TIM_TimeBaseStructure.TIM_Period		= 255;
+	TIM_TimeBaseStructure.TIM_Prescaler		= 0;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM8, &TIM_TimeBaseStructure);
+
+	//
+	TIM_ETRClockMode1Config(TIM8, TIM_ExtTRGPSC_OFF, TIM_ExtTRGPolarity_NonInverted, 0);
 
 	/* Enable the TIM8 trigger Interrupt */
 	NVIC_InitStructure.NVIC_IRQChannel						= TIM8_TRG_COM_TIM14_IRQn;
@@ -226,8 +213,7 @@ void InitSyncTimer()
 	NVIC_Init(&NVIC_InitStructure);
 
 	TIM_ITConfig(TIM8, TIM_IT_Trigger, ENABLE);
-
-	//TIM_Cmd(TIM8, ENABLE);
+	TIM_Cmd(TIM8, ENABLE);
 
 }
 
@@ -259,6 +245,8 @@ void InitUSART()
 	USART_Cmd(USART1, ENABLE);
 }
 
+
+// DMA Channel and number are related to internal peripherical (UART1) used
 void InitDMA()
 {
 	NVIC_InitTypeDef   	NVIC_InitStructure;
@@ -268,7 +256,6 @@ void InitDMA()
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 2;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
-	// TODO: No DMA Send Interrupt
 	NVIC_Init(&NVIC_InitStructure);
 
 #ifdef DMA_RECEPTION
@@ -336,7 +323,6 @@ void InitDMA()
 #endif
 
 	DMA_Cmd(DMA2_Stream7, DISABLE);
-
 
 }
 

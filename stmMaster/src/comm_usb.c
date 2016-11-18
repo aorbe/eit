@@ -234,8 +234,8 @@ static uint8_t  usbd_cdc_DataIn (void *pdev, uint8_t epnum)
 	if (USB_Tx_State == 1)
 	{
 		if (APP_Tx_length == 0)	{
-			if (running) {
-				UsbControl 			&= ~((uint32_t)0x01 << UsbTxNext);
+			if (running > 1) {
+				UsbControl 	&= ~((uint32_t)0x01 << UsbTxNext);
 				for(i=0; i<USB_NUM_BUFFERS; i++)
 				{
 					if(UsbControl & ((uint32_t)0x01 <<  i))
@@ -289,7 +289,7 @@ static uint8_t  usbd_cdc_DataIn (void *pdev, uint8_t epnum)
 			APP_Tx_ptr_idx += USB_Tx_length;
 			APP_Tx_length -= USB_Tx_length;
 			/* Prepare the available data buffer to be sent on IN endpoint */
-			if(running)
+			if(running > 1)
 				DCD_EP_Tx (pdev, CDC_IN_EP, (uint8_t*)&USB_buffer[UsbTxNext][USB_Tx_ptr], USB_Tx_length);
 			else
 				DCD_EP_Tx (pdev, CDC_IN_EP, (uint8_t*)&APP_Tx_Buffer[USB_Tx_ptr], USB_Tx_length);
@@ -325,29 +325,28 @@ static uint8_t  usbd_cdc_DataOut (void *pdev, uint8_t epnum)
 		case 0x01:		// Acquisition Start
 			if ((USB_Rx_Cnt == 5) && !UsbConfig)
 			{
-				GPIOC->BSRRL = GPIO_Pin_8;
 				if(!running)
 				{
 
 					if (APP_Rx_Buffer[2])
 					{
-						TIM1->PSC = (256*84) - 1;				// Calibration
+						TIM8->PSC = 127;				// Calibration
 						tx_data[4] = 0x01;
 					}
 					else
 					{
-						TIM1->PSC	= 84 - 1;				// Normal operation
+						TIM8->PSC	= 0;				// Normal operation
 						tx_data[4] 	= 0x00;
 					}
-					running = 1;
+					running = 0x01;
 					//DMA2_Stream5->CR	|= (uint32_t)DMA_SxCR_EN;			// Enable Receiving DMA
 				}
 			}
 			break;
 		case 0x02:		// Acquisition Stop
-			if ((USB_Rx_Cnt == 4) && (running & 1))
+			if ((USB_Rx_Cnt == 4) && (running > 1))
 			{
-				running = 2;
+				running = 0x04;
 			}
 			break;
 		case 0x03:		// Configuration Read
@@ -403,7 +402,7 @@ static void Handle_USBAsynchXfer (void *pdev)
 	uint8_t i;
 
 	if(USB_Tx_State != 1) {
-		if(running)
+		if(running > 1)
 		{
 			if (!APP_Tx_length) {
 				for(i=0; i<USB_NUM_BUFFERS; i++)
@@ -465,7 +464,7 @@ static void Handle_USBAsynchXfer (void *pdev)
 
 		USB_Tx_State = 1;
 
-		if(running)
+		if(running > 1)
 			DCD_EP_Tx (pdev, CDC_IN_EP, (uint8_t*)&USB_buffer[UsbTxNext][USB_Tx_ptr], USB_Tx_length);
 		else
 			DCD_EP_Tx (pdev, CDC_IN_EP, (uint8_t*)&APP_Tx_Buffer[USB_Tx_ptr], USB_Tx_length);

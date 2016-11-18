@@ -3,36 +3,21 @@
 #include "stm32f4_discovery.h"
 #include "main.h"
 
-
-
-/** @addtogroup STM32F4_Discovery_Peripheral_Examples
- * @{
- */
-
-/** @addtogroup IO_Toggle
- * @{
- */
-
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 extern volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
-extern volatile int16_t data[CAPTURE_LEN];	// Store each AD reading
-extern volatile uint8_t snd_state;			// DMA TX flag
+extern volatile int32_t data[CAPTURE_LEN];	// Store each AD reading
 extern volatile int16_t samples_cont;		// Counts each ADC pulse
 extern volatile uint32_t comm_ctrl;		// Each bit related to one buffer
 extern volatile uint8_t values[256][10];
-
-//extern volatile float32_t Sin[20], Cos[20];
-//extern volatile float32_t sAvg, sSin, sCos;
-
 
 volatile uint8_t last_idx;				// Last writing position on RX Buffer
 volatile uint8_t rcv_idx;					// Writing position on RX Buffer
 uint8_t buffer = 0;							// Number of the actual RX buffer
 
-
+//volatile int16_t teste[CAPTURE_LEN];
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
@@ -50,39 +35,41 @@ uint8_t buffer = 0;							// Number of the actual RX buffer
  * @param  None
  * @retval None
  */
-inline void EXTI1_IRQHandler(void) {
+__attribute__( (section(".data#") ) ) void EXTI1_IRQHandler(void) {
 	EXTI->PR = EXTI_Line1;						// Clear the EXTI line 1 pending bit
 	if (samples_cont)							// Reach limit
-		data[--samples_cont] = GPIOE->IDR;
+	{
+		data[--samples_cont] = ((int16_t)GPIOD->IDR) << 16 | ((int16_t)GPIOE->IDR);
+		//data[--samples_cont] = teste[samples_cont];
+	}
 	else
-		EXTI->IMR &= ~EXTI_Line1;				// Disable DAV Interrupt
+	{
+		//EXTI->IMR &= ~EXTI_Line1;	// hardcoded for faster execution?
+		EXTI->IMR 	&= 0xFFFE; 					// Disable DAV Interrupt
+	}
 }
 
-/**
- * @brief  This function handles External line 8 interrupt request.
- * @param  None
- * @retval None
- */
-inline void EXTI9_5_IRQHandler(void)
-{
-	EXTI->PR = EXTI_Line8;					// Clear the EXTI line 8 pending bit
-	if(GPIOC->IDR & GPIO_Pin_8)
-		TIM8->CR1 |= TIM_CR1_CEN;				// Starting Sync Timer
-	else
-		TIM8->CR1 &= ~TIM_CR1_CEN;				// Starting Sync Timer
-}
+__attribute__( (section(".data#") ) ) void EXTI9_5_IRQHandler(void) {
+	EXTI->PR = EXTI_Line6;
+    if (TIM8->CNT)
+    {
+    	//GPIOD->ODR  ^= GPIO_Pin_13;
+		TIM8->CNT = 0;
+    }
 
+}
 
 #ifndef DMA_CAPTURE
 
 /**
- * @brief  This function handles TIM1 Trigger interrupt request.
+ * @brief  This function handles TIM8 Trigger interrupt request.
  * @param  None
  * @retval None
  */
-void TIM8_TRG_COM_TIM14_IRQHandler(void)
+__attribute__( (section(".data#") ) ) void TIM8_TRG_COM_TIM14_IRQHandler(void)
 {
 	TIM8->SR 	 = (uint16_t) ~(TIM_IT_Trigger);		// Clear Timer Trigger interrupt
+	GPIOD->ODR  ^= GPIO_Pin_14;
 	EXTI->IMR	|= EXTI_Line1;							// Enable DAV interrupt
 }
 
@@ -107,11 +94,11 @@ void TIM3_IRQHandler(void)
 
 #ifdef DMA_RECEPTION
 
+volatile uint32_t *from, *to;
+
+//__attribute__( (section(".data#") ) )
 void DMA2_Stream5_IRQHandler(void)
 {
-	uint16_t tmp;
-	uint32_t *from, *to;
-
 	DMA2->HIFCR = DMA_HIFCR_CTCIF5;
 
 	// Verify frame
@@ -210,7 +197,7 @@ void USART1_IRQHandler(void)
 #endif
 
 // DMA Send
-void DMA2_Stream7_IRQHandler(void) {
+__attribute__( (section(".data#") ) ) void DMA2_Stream7_IRQHandler(void) {
 	DMA2->HIFCR = (uint32_t)DMA_IT_TCIF7;
 }
 

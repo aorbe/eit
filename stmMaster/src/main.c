@@ -23,7 +23,7 @@
  * init.c - MCU pheripericals initialization
  * 			DMA2 Stream 5/7 for receive and send throught UART
  * 			UART configuration
- * 			TIM1, TIM3 for syncronization
+ * 			TIM8, TIM4 for syncronization
  * 			TIM2 for communication timeout
  * 			TIM6 for send period
  *
@@ -103,6 +103,8 @@ int main(void) {
 	uint32_t *from, *to;
 	uint16_t* idx 	= (uint16_t *) &tx_data[1];							// Frame code -> idx
 
+	unsigned int l1 = 0, l2=0;
+
 	USBD_Init(&USB_OTG_dev,
 			USB_OTG_FS_CORE_ID,
 			&USR_desc,
@@ -131,34 +133,14 @@ int main(void) {
 
 	while (1)
 	{
-		if(!(TIM6->CR1 & TIM_CR1_CEN) && ((tx_data[4]) || (TIM3->CNT == 127))  && (running & 0x01))
+		// PENSAR
+		if((tx_data[4] || (TIM4->CNT == 127))  && (running & 0x01))
 		{
 			tx_data[1] = 0x00;
 			tx_data[2] = 0x00;
-
-			/*
-			if( ((*idx) & 0xFF) == 0xFF)									// Max code value ?
-			{
-				GPIOD->ODR 			^= GPIO_Pin_13;							// LED 13 blinking
-			}
-			if((*idx) >= 0xFFFF)											// Max code value ?
-			{
-				if (!(running & 0x1))										// Capture process stopped ?
-				{
-					TIM6->CR1 &= (uint16_t)~TIM_CR1_CEN;					// Stop timer
-					running = 0;
-					return;
-				}
-				(*idx) = 0;
-			}
-			else
-				(*idx)++;													// Increment code value
-			*
-			*/
+			running = 0x02;
 			DMA2_Stream7->CR	|= (uint32_t)DMA_SxCR_EN;					// Start Sending DMA
-
-			TIM6->CR1 |= TIM_CR1_CEN;
-			DMA2_Stream5->CR	|= (uint32_t)DMA_SxCR_EN;			// Enable Receiving DMA
+			DMA2_Stream5->CR	|= (uint32_t)DMA_SxCR_EN;					// Enable Receiving DMA
 		}
 
 	}

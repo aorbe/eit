@@ -5,7 +5,7 @@ LD  = arm-none-eabi-ld -v
 CP  = arm-none-eabi-objcopy
 LDSCRIPT = stm32_flash.ld
 
-FW  := /home/asantos/dev/STM32F4-Discovery
+FW  := /home/asantos/git/eit_code/STM32F4-Discovery
 INC_DISCOVERY := $(FW)/Utilities/STM32F4-Discovery
 SRC_DISCOVERY := $(FW)/Utilities/STM32F4-Discovery
 INC_STD_DRIVER:=$(FW)/Libraries/STM32F4xx_StdPeriph_Driver/inc
@@ -24,9 +24,9 @@ INCLUDE = $(EXTRA_INCLUDE) -I$(INC_DISCOVERY) -I$(INC_STD_DRIVER) -I$(INC_USB_DE
 
 DEFS += -DUSE_STDPERIPH_DRIVER -DSTM32F4XX -D__FPU_PRESENT="1" -DMANGUSTA_DISCOVERY -DARM_MATH_CM4 -DHSE_VALUE=8000000 $(NODE)
 LIBS = -lm -lc
-MC_FLAGS = -mcpu=cortex-m4 -mtune=cortex-m4 -mthumb -mlittle-endian -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fsingle-precision-constant -nostartfiles  
+MC_FLAGS = -Ofast -mcpu=cortex-m4 -mtune=cortex-m4 -mthumb -mlittle-endian -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fsingle-precision-constant -nostartfiles  
 AS_FLAGS = 
-C_FLAGS = -c $(MC_FLAGS) $(INCLUDE) $(LIBS) $(DEFS) -Wl,-T,../stm32_flash.ld -MD -MP -O3
+C_FLAGS = -fverbose-asm -c $(MC_FLAGS) $(INCLUDE) $(LIBS) $(DEFS) -Wl,-T,../stm32_flash.ld -MD -MP -O3
 LD_FLAGS = $(MC_FLAGS) $(INCLUDE) $(DEFS) -Wl,-T,../stm32_flash.ld -MD -MP -Os
 
 user_objects = $(patsubst %c, %o, $(wildcard ../src/*.c))

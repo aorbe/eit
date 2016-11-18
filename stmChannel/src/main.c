@@ -39,7 +39,7 @@ struct FP
 		uint16_t i[2];
 		uint8_t b[4];
 	};
-} fp;
+} sSin, sCos;
 
 
 /* Function ------------------------------------------------------------------*/
@@ -48,25 +48,80 @@ void InitSinCosValues(void);
 
 /* Variables -----------------------------------------------------------------*/
 volatile int16_t samples_cont = CAPTURE_LEN;		// Counts each ADC pulse
-volatile int16_t data[CAPTURE_LEN];			// Store each AD reading
-volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
-volatile uint8_t snd_state = 0;			// DMA TX flag
+volatile int32_t data[CAPTURE_LEN];			// Store each AD reading
 volatile uint32_t comm_ctrl = 0;		// Each bit related to one buffer
-
-uint16_t i = 0;
+volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE] __attribute__ ((aligned (8)));
 
 float Sin[20], Cos[20];
-float sAvg = 0, sSin=0, sCos = 0;
-volatile uint8_t values[256][10];
-uint8_t samples_idx = 0;
+float sAvg = 0;
 
-uint16_t erro=0;
-uint8_t pos = 0;
+uint16_t x=0;
+uint16_t node;
+
 int32_t total[20];
 
-uint8_t x = 0;
+int32_t *sDst;
+int32_t *sSrc;
+volatile uint8_t values[256][10] __attribute__ ((aligned (8)));
 
-//__ALIGN_BEGIN USB_OTG_CORE_HANDLE     USB_OTG_dev __ALIGN_END ;
+uint8_t samples_idx = 0;
+
+__attribute__( (section(".data#") ) ) void demodula()
+{
+	// Normal Mode : Amplitude/Phase/Quality for each data set (CAPTURE_LEN)
+	// TIM8 identifies each capture (communication is assynchronous)
+	samples_idx = TIM8->CNT;
+	//if (samples_idx == 0x12)
+	//	GPIOD->ODR			^= GPIO_Pin_12;
+
+	// Amplitude = (S^2 + C^2)^(.5)
+	// Phase = atan(C/S)
+	// S = SUM (sin(wt) .* capture)
+	// C = SUM (cos(wt) .* capture)
+	sSin.f = 0;
+	sCos.f = 0;
+
+	// As frequency are multiple and floating point multiplication is very slow
+	// First all sum is done and after only 20 multiplications
+	x = 20;
+	sDst = total;
+	sSrc = data;
+	while(x > 0u)
+	{
+		*(sDst++) = *(sSrc++);
+		x--;
+	}
+
+	// I dont known whether if or % are faster
+	node = 0;
+	for(x=20; x<CAPTURE_LEN; x++)
+	{
+		total[node] = total[node] +  data[x];
+		node++;
+		if (node >= 20)
+			node = 0;
+	}
+	for(x=0; x<20; x++)
+	{
+		sSin.f = sSin.f + (Sin[x] * total[x]);
+		sCos.f = sCos.f + (Cos[x] * total[x]);
+	}
+
+	// TODO: Test diferent implementations
+/*
+	for(x=0;x<CAPTURE_LEN;x++)
+	{
+		sSin = sSin + Sin[x%20] * data[x];
+		sCos = sCos + Cos[x%20] * data[x];
+	}
+*/
+	for(x=0; x<4; x++) {
+		values[samples_idx][x]   = sSin.b[x];
+		values[samples_idx][x+4] = sCos.b[x];
+	}
+	values[samples_idx][8] = samples_idx;
+	values[samples_idx][9] = 0x80;
+}
 
 /**
  * @brief  Main program
@@ -74,10 +129,6 @@ uint8_t x = 0;
  * @retval None
  */
 int main(void) {
-	uint8_t node;
-	uint8_t state_scan = 0;
-	volatile int32_t *sDst;
-	volatile int16_t *sSrc;
 
 	RCC_AHB1PeriphClockCmd(	RCC_AHB1Periph_DMA2 |
 							RCC_AHB1Periph_GPIOA  |
@@ -88,10 +139,11 @@ int main(void) {
 	RCC_APB1PeriphClockCmd(	RCC_APB1Periph_TIM3, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG | RCC_APB2Periph_TIM8 | RCC_APB2Periph_USART1, ENABLE);
 
+	for(x=0; x<SIZE_RCV_BUFFER * FRAME_SIZE; x++)
+		comm_data[x/FRAME_SIZE][x%FRAME_SIZE] = 0;
 
-	memset(comm_data, 0, SIZE_RCV_BUFFER * FRAME_SIZE);
-
-	memset(values, 0xFF, 2560);
+	for(x=0; x<2560; x++)
+		values[x/10][x%10] = 0xFF;
 
 	config();
 	InitSinCosValues();
@@ -103,120 +155,38 @@ int main(void) {
 	    	if (comm_data[0][4])	// MODE
 	    	{
 	    		// Calibration Mode : Data without any treatment
-	    		memcpy(values, data, CAPTURE_LEN*2);
+	    		for(x=0;x<CAPTURE_LEN;x++)
+	    		{
+	    			((int16_t*)values)[x] = data[x];
+	    		}
 	    	}
 	    	else
 	    	{
-	    		// Normal Mode : Amplitude/Phase/Quality for each data set (CAPTURE_LEN)
-	    		// TIM8 identifies each capture (communication is assynchronous)
-				samples_idx = TIM8->CNT;
-
-				// Amplitude = (S^2 + C^2)^(.5)
-				// Phase = atan(C/S)
-				// S = SUM (sin(wt) .* capture)
-				// C = SUM (cos(wt) .* capture)
-				sSin = 0;
-				sCos = 0;
-
-				// As frequency are multiple and floating point multiplication is very slow
-				// First all sum is done and after only 20 multiplications
-				erro = 20;
-				sDst = total;
-				sSrc = data;
-				while(erro > 0u)
-				{
-					*(sDst++) = *(sSrc++);
-					erro--;
-				}
-
-				node = 0;
-
-				for(erro=20; erro<CAPTURE_LEN; erro++)
-				{
-					total[node] = total[node] +  data[erro];
-					node++;
-					if (node >= 20)
-						node = 0;
-				}
-				for(erro=0; erro<20; erro++)
-				{
-					sSin = sSin + (Sin[erro] * total[erro]);
-					sCos = sCos + (Cos[erro] * total[erro]);
-				}
-
-				// TODO: Test diferent implementations
-
-
-/*
-				for(erro=0;erro<CAPTURE_LEN;erro++)
-				{
-					sSin = sSin + Sin[erro%20] * data[erro];
-					sCos = sCos + Cos[erro%20] * data[erro];
-				}
-*/
-
-
-				fp.f = sSin;
-				for(erro=0; erro<4; erro++)
-					values[samples_idx][erro] = fp.b[erro];
-
-				fp.f = sCos;
-				for(erro=0; erro<4; erro++)
-					values[samples_idx][erro+4] = fp.b[erro];
-
-				values[samples_idx][8] = samples_idx;
-				values[samples_idx][9] = 0x80;
+	    		demodula();
 	    	}
 			//sSin = 0;
 			//sCos = 0;
 			samples_cont = CAPTURE_LEN;
-
 	    }
 
 
-/*	    if(!snd_state && comm_ctrl)
-	    {
-	    	state_scan = 32;
-	    	while(!(comm_ctrl >> --state_scan));
-			node = comm_data[state_scan][3]++;
-			if (node > SLAVE_QTY)
-				node = SLAVE_QTY;
-			//if (comm_data[state_scan][2])
-			//{
-			//	memcpy((void*)&comm_data[state_scan][node*10], (void*)data[comm_data[state_scan][1]*10], 10);
-			//}
-			//else
-			{
-				memcpy((void*)&comm_data[state_scan][node*10], (void*)values[comm_data[state_scan][1]], 10);
-				memset((void*)values[comm_data[state_scan][1]], 0xFF, 10);
-			}
-			if (comm_data[state_scan][1] == 0xFF)
-				GPIOD->ODR			^= GPIO_Pin_15;
-			snd_state = state_scan + 1;
-			DMA2_Stream7->NDTR		= (uint32_t) FRAME_SIZE;
-			DMA2_Stream7->M0AR		= (uint32_t) comm_data[state_scan];
-			DMA2_Stream7->CR		|= (uint32_t)DMA_SxCR_EN;		// Send
-	    }*/
 
-
-	    /*if ((TIM8->CCR3 > 2) && (TIM8->CCR3 < 0xFD))
-	    {
-			GPIOD->BSRRH = GPIO_Pin_14;
-			TIM8->CNT -= TIM8->CCR3;
-		} else {
-			GPIOD->BSRRL = GPIO_Pin_14;
-		}*/
+	    /*
 	    if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_3))
 	    	GPIOD->BSRRH = GPIO_Pin_13;
 	    else
 	    	GPIOD->BSRRL = GPIO_Pin_13;
+	    */
 
 	}
 	return 0;
 }
 
+//extern volatile int16_t teste[CAPTURE_LEN];
+
 void InitSinCosValues()
 {
+	uint16_t t_i;
 	// Sine and Cossine data
 	Sin[ 0] = 0.000000000000000;
 	Sin[ 1] = 0.309016994374947;
@@ -259,6 +229,11 @@ void InitSinCosValues()
 	Cos[17] = 0.587785252292473;
 	Cos[18] = 0.809016994374947;
 	Cos[19] = 0.951056516295154;
+
+	//for(t_i=0; t_i<CAPTURE_LEN; t_i++)
+	//{
+	//	teste[t_i] = Cos[t_i%20]*1000;
+	//}
 }
 
 #ifdef  USE_FULL_ASSERT
@@ -281,13 +256,3 @@ void assert_failed(uint8_t* file, uint32_t line)
 	}
 }
 #endif
-
-/**
- * @}
- */
-
-/**
- * @}
- */
-
-/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/

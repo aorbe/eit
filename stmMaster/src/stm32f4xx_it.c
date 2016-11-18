@@ -5,17 +5,18 @@
 #include "usb_conf.h"
 #include "usbd_hid_core.h"
 
-volatile uint8_t USB_buffer[USB_NUM_BUFFERS][USB_BUFFER_SIZE];								// Reception buffer
 volatile int32_t control = USB_BUFFER_INIT;
 volatile uint32_t UsbControl 	= 0;									// 32 bits mapped indication of USB_buffer utilization
 
-extern volatile uint8_t tx_data[FRAME_SIZE];			// send data. Fix format
 volatile uint8_t running 		= 0;
 volatile uint8_t next_bank 		= 0;									// bank been used
 volatile uint8_t override_1		= 0;									// byte overwrite by CRC
 volatile uint8_t override_2		= 0;									// byte overwrite by CRC
+volatile uint16_t comm_toggle   = 0;
+volatile uint16_t next_idx 		= 0;
+extern volatile uint8_t tx_data[FRAME_SIZE];							// send data. Fix format
+volatile uint8_t USB_buffer[USB_NUM_BUFFERS][USB_BUFFER_SIZE];			// Reception buffer
 
-uint16_t next_idx = 0;
 // VERIFY: Using DMA2_Stream7 IF to verify transmission completed
 //uint8_t tx_state = 0;												// UART send DMA indication
 
@@ -59,11 +60,12 @@ void OTG_FS_IRQHandler(void)
   * @param  None
   * @retval None
   */
+//__attribute__( ( section(".data#") ) )
 void DMA2_Stream5_IRQHandler(void)
 {
 	DMA2->HIFCR 		 = DMA_HIFCR_CTCIF5;							// Clear Interrupt Flag
 	uint16_t* idx;
-//	TIM2->CNT			 = 0;											// Reset timeout
+	TIM2->CNT			 = 0;											// Reset timeout
 
 	// Verify frame
 	if ((USB_buffer[next_bank][control] != 0xFF) ||
@@ -80,6 +82,8 @@ void DMA2_Stream5_IRQHandler(void)
 	if (*idx == next_idx)												// Packet OK
 	{
 		GPIOD->BSRRH		= GPIO_Pin_14;
+		if (*idx & 0xFF == 0xFF)
+			GPIOD->ODR ^= GPIO_Pin_12;
 		if (*idx != 0xFFFF)
 			next_idx = (*idx) + 1;
 		else
@@ -105,7 +109,7 @@ void DMA2_Stream5_IRQHandler(void)
 					next_bank++;
 				}
 			}
-			GPIOD->ODR			^= GPIO_Pin_12;								// Blink LED 12
+			// BACK GPIOD->ODR			^= GPIO_Pin_12;								// Blink LED 12
 		}
 		else
 		{
@@ -146,11 +150,19 @@ void TIM2_IRQHandler(void)
   * @param  None
   * @retval None
   */
-void TIM6_DAC_IRQHandler(void)
+__attribute__( (section(".data#") ) ) void TIM8_UP_TIM13_IRQHandler(void)
 {
-	TIM6->SR		= (uint16_t)~TIM_IT_Update;							// Clear interrupt
+	TIM8->SR		= (uint16_t)~TIM_IT_Update;							// Clear interrupt
+	if(comm_toggle) {
+		comm_toggle--;
+		return;
+	}
+	//comm_toggle = tx_data[4]?1024:1;
+	comm_toggle = 1;
 	uint16_t* idx 	= (uint16_t *) &tx_data[1];							// Frame code -> idx
+
 #ifdef _SIMULATION
+
 	// Verify frame
 	USB_buffer[next_bank][control] 		= 0xFF;
 	USB_buffer[next_bank][control+4] 	= 0x01;	//MODE
@@ -207,21 +219,18 @@ void TIM6_DAC_IRQHandler(void)
 	}
 #else
 	// VERIFY: Using DMA2_Stream7 IF to verify transmission completed
-	if (DMA2->HISR & DMA_HISR_TCIF7)									// Transmission in progress ?
-	// if (!tx_state)													// Transmission in progress ?
+	if ((running > 1) && (DMA2->HISR & DMA_HISR_TCIF7))					// Transmission in progress ?
 	{
-		DMA2->HIFCR			=  DMA_HIFCR_CTCIF7;							// Transmission clear flag
+		DMA2->HIFCR			=  DMA_HIFCR_CTCIF7;						// Transmission clear flag
 		if( ((*idx) & 0xFF) == 0xFF)									// Max code value ?
 		{
 			GPIOD->ODR 			^= GPIO_Pin_15;							// LED 15 blinking
 		}
 		if((*idx) >= 0xFFFF)											// Max code value ?
 		{
-			if (!(running & 0x1))										// Capture process stopped ?
+			if (running > 0x02)											// Capture process stopped ?
 			{
-				TIM6->CR1 &= (uint16_t)~TIM_CR1_CEN;					// Stop timer
-				GPIOC->BSRRH = GPIO_Pin_8;
-				running = 0;
+				running = 0x00;
 				return;
 			}
 			(*idx) = 0;
@@ -229,8 +238,6 @@ void TIM6_DAC_IRQHandler(void)
 		else
 			(*idx)++;													// Increment code value
 		DMA2_Stream7->CR	|= (uint32_t)DMA_SxCR_EN;					// Start Sending DMA
-		// VERIFY: Using DMA2_Stream7 IF to verify transmission completed
-		//tx_state			= 1;										// Enable transmission
 	}
 #endif
 }
