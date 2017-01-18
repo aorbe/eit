@@ -35,11 +35,20 @@
 
 #define MODE				tx_data[4]
 
+/*
 #define USB_NUM_BUFFERS		6
 #define USB_FULL_BUFFER		0x3F
 #define USB_BUFFER_SIZE		20492	// 2^N + 12
 #define USB_BUFFER_INIT		20320	// USB_BUFFER_SIZE - FRAME_SIZE
 #define USB_TRANSF_SIZE		20488
+#define USB_DATA_SIZE		80
+*/
+
+#define USB_NUM_BUFFERS		6
+#define USB_FULL_BUFFER		0x3F
+#define USB_BUFFER_SIZE		10252	// 2^N + 12
+#define USB_BUFFER_INIT		10160	// USB_BUFFER_SIZE - FRAME_SIZE
+#define USB_TRANSF_SIZE		10248
 #define USB_DATA_SIZE		80
 
 #endif /* MAIN_H_ */

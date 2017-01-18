@@ -9,6 +9,7 @@
 /* Private variables ---------------------------------------------------------*/
 extern volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
 extern volatile int32_t data[CAPTURE_LEN];	// Store each AD reading
+extern volatile int16_t *sdata;
 extern volatile int16_t samples_cont;		// Counts each ADC pulse
 extern volatile uint32_t comm_ctrl;		// Each bit related to one buffer
 extern volatile uint8_t values[256][10];
@@ -35,12 +36,13 @@ uint8_t buffer = 0;							// Number of the actual RX buffer
  * @param  None
  * @retval None
  */
-__attribute__( (section(".data#") ) ) void EXTI1_IRQHandler(void) {
+//__attribute__( (section(".data#") ) )
+void EXTI1_IRQHandler(void) {
 	EXTI->PR = EXTI_Line1;						// Clear the EXTI line 1 pending bit
 	if (samples_cont)							// Reach limit
 	{
-		data[--samples_cont] = ((int16_t)GPIOD->IDR) << 16 | ((int16_t)GPIOE->IDR);
-		//data[--samples_cont] = teste[samples_cont];
+		sdata[--samples_cont] = ((int16_t)GPIOD->IDR);
+		sdata[--samples_cont] = ((int16_t)GPIOE->IDR);
 	}
 	else
 	{
@@ -49,7 +51,8 @@ __attribute__( (section(".data#") ) ) void EXTI1_IRQHandler(void) {
 	}
 }
 
-__attribute__( (section(".data#") ) ) void EXTI9_5_IRQHandler(void) {
+//__attribute__( (section(".data#") ) )
+void EXTI9_5_IRQHandler(void) {
 	EXTI->PR = EXTI_Line6;
     if (TIM8->CNT)
     {
@@ -69,7 +72,7 @@ __attribute__( (section(".data#") ) ) void EXTI9_5_IRQHandler(void) {
 __attribute__( (section(".data#") ) ) void TIM8_TRG_COM_TIM14_IRQHandler(void)
 {
 	TIM8->SR 	 = (uint16_t) ~(TIM_IT_Trigger);		// Clear Timer Trigger interrupt
-	GPIOD->ODR  ^= GPIO_Pin_14;
+	//GPIOD->ODR  ^= GPIO_Pin_14;
 	EXTI->IMR	|= EXTI_Line1;							// Enable DAV interrupt
 }
 
@@ -131,7 +134,8 @@ void DMA2_Stream5_IRQHandler(void)
 		GPIOD->ODR			^= GPIO_Pin_15;
 
 	//snd_state = buffer + 1;
-	DMA2_Stream7->NDTR		= (uint32_t) FRAME_SIZE;
+	DMA2->HIFCR = (uint32_t)DMA_IT_TCIF7;
+	//DMA2_Stream7->NDTR		= (uint32_t) FRAME_SIZE;
 	DMA2_Stream7->M0AR		= (uint32_t) comm_data[buffer];
 	DMA2_Stream7->CR		|= (uint32_t)DMA_SxCR_EN;		// Send
 

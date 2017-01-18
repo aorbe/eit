@@ -252,11 +252,11 @@ void InitDMA()
 	NVIC_InitTypeDef   	NVIC_InitStructure;
 
 	/* Enable DMA2 Stream 7 Interrupt */
-	NVIC_InitStructure.NVIC_IRQChannel						= DMA2_Stream7_IRQn;
+	/*NVIC_InitStructure.NVIC_IRQChannel						= DMA2_Stream7_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 2;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
+	NVIC_Init(&NVIC_InitStructure);*/
 
 #ifdef DMA_RECEPTION
 	/* Enable DMA2 Stream 5 Interrupt */
@@ -307,7 +307,7 @@ void InitDMA()
 
 	DMA_DeInit(DMA2_Stream7);
 	DMA_Init(DMA2_Stream7, &DMA_SendStructure);
-	DMA_ITConfig(DMA2_Stream7, DMA_IT_TC, ENABLE);
+	//DMA_ITConfig(DMA2_Stream7, DMA_IT_TC, ENABLE);
 
 #ifdef DMA_RECEPTION
 	DMA_DeInit(DMA2_Stream5);

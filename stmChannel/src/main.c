@@ -49,6 +49,7 @@ void InitSinCosValues(void);
 /* Variables -----------------------------------------------------------------*/
 volatile int16_t samples_cont = CAPTURE_LEN;		// Counts each ADC pulse
 volatile int32_t data[CAPTURE_LEN];			// Store each AD reading
+volatile int16_t *sdata;
 volatile uint32_t comm_ctrl = 0;		// Each bit related to one buffer
 volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE] __attribute__ ((aligned (8)));
 
@@ -68,59 +69,7 @@ uint8_t samples_idx = 0;
 
 __attribute__( (section(".data#") ) ) void demodula()
 {
-	// Normal Mode : Amplitude/Phase/Quality for each data set (CAPTURE_LEN)
-	// TIM8 identifies each capture (communication is assynchronous)
-	samples_idx = TIM8->CNT;
-	//if (samples_idx == 0x12)
-	//	GPIOD->ODR			^= GPIO_Pin_12;
 
-	// Amplitude = (S^2 + C^2)^(.5)
-	// Phase = atan(C/S)
-	// S = SUM (sin(wt) .* capture)
-	// C = SUM (cos(wt) .* capture)
-	sSin.f = 0;
-	sCos.f = 0;
-
-	// As frequency are multiple and floating point multiplication is very slow
-	// First all sum is done and after only 20 multiplications
-	x = 20;
-	sDst = total;
-	sSrc = data;
-	while(x > 0u)
-	{
-		*(sDst++) = *(sSrc++);
-		x--;
-	}
-
-	// I dont known whether if or % are faster
-	node = 0;
-	for(x=20; x<CAPTURE_LEN; x++)
-	{
-		total[node] = total[node] +  data[x];
-		node++;
-		if (node >= 20)
-			node = 0;
-	}
-	for(x=0; x<20; x++)
-	{
-		sSin.f = sSin.f + (Sin[x] * total[x]);
-		sCos.f = sCos.f + (Cos[x] * total[x]);
-	}
-
-	// TODO: Test diferent implementations
-/*
-	for(x=0;x<CAPTURE_LEN;x++)
-	{
-		sSin = sSin + Sin[x%20] * data[x];
-		sCos = sCos + Cos[x%20] * data[x];
-	}
-*/
-	for(x=0; x<4; x++) {
-		values[samples_idx][x]   = sSin.b[x];
-		values[samples_idx][x+4] = sCos.b[x];
-	}
-	values[samples_idx][8] = samples_idx;
-	values[samples_idx][9] = 0x80;
 }
 
 /**
@@ -138,6 +87,8 @@ int main(void) {
 							RCC_AHB1Periph_GPIOE, ENABLE);
 	RCC_APB1PeriphClockCmd(	RCC_APB1Periph_TIM3, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG | RCC_APB2Periph_TIM8 | RCC_APB2Periph_USART1, ENABLE);
+
+	sdata = data;
 
 	for(x=0; x<SIZE_RCV_BUFFER * FRAME_SIZE; x++)
 		comm_data[x/FRAME_SIZE][x%FRAME_SIZE] = 0;
@@ -162,11 +113,65 @@ int main(void) {
 	    	}
 	    	else
 	    	{
-	    		demodula();
+	    		//demodula();
+	    		// Normal Mode : Amplitude/Phase/Quality for each data set (CAPTURE_LEN)
+	    		// TIM8 identifies each capture (communication is assynchronous)
+	    		samples_idx = TIM8->CNT;
+	    		//if (samples_idx == 0x12)
+	    		//	GPIOD->ODR			^= GPIO_Pin_12;
+
+	    		// Amplitude = (S^2 + C^2)^(.5)
+	    		// Phase = atan(C/S)
+	    		// S = SUM (sin(wt) .* capture)
+	    		// C = SUM (cos(wt) .* capture)
+	    		sSin.f = 0;
+	    		sCos.f = 0;
+
+	    		// As frequency are multiple and floating point multiplication is very slow
+	    		// First all sum is done and after only 20 multiplications
+	    		x = 20;
+	    		sDst = total;
+	    		sSrc = data;
+	    		while(x > 0u)
+	    		{
+	    			x--;
+	    			*(sDst++) = *(sSrc++);
+	    		}
+
+	    		// I dont known whether if or % are faster
+	    		node = 0;
+	    		for(x=20; x<CAPTURE_LEN; x++)
+	    		{
+	    			total[node] = total[node] +  data[x];
+	    			node++;
+	    			if (node >= 20)
+	    				node = 0;
+	    		}
+	    		for(x=0; x<20; x++)
+	    		{
+	    			sSin.f = sSin.f + (Sin[x] * total[x]);
+	    			sCos.f = sCos.f + (Cos[x] * total[x]);
+	    		}
+
+	    		// TODO: Test diferent implementations
+	    	/*
+	    		for(x=0;x<CAPTURE_LEN;x++)
+	    		{
+	    			sSin = sSin + Sin[x%20] * data[x];
+	    			sCos = sCos + Cos[x%20] * data[x];
+	    		}
+	    	*/
+	    		for(x=0; x<4; x++) {
+	    			values[samples_idx][x]   = sSin.b[x];
+	    			values[samples_idx][x+4] = sCos.b[x];
+	    		}
+	    		values[samples_idx][8] = samples_idx;
+	    		values[samples_idx][9] = 0x80;
+
 	    	}
 			//sSin = 0;
 			//sCos = 0;
-			samples_cont = CAPTURE_LEN;
+			samples_cont = CAPTURE_LEN * 2;
 	    }
 
 
