@@ -73,7 +73,10 @@ __attribute__( (section(".data#") ) ) void TIM8_TRG_COM_TIM14_IRQHandler(void)
 {
 	TIM8->SR 	 = (uint16_t) ~(TIM_IT_Trigger);		// Clear Timer Trigger interrupt
 	//GPIOD->ODR  ^= GPIO_Pin_14;
-	EXTI->IMR	|= EXTI_Line1;							// Enable DAV interrupt
+	// Init DMA1
+
+
+	// EXTI->IMR	|= EXTI_Line1;							// Enable DAV interrupt
 }
 
 #endif
@@ -95,9 +98,21 @@ void TIM3_IRQHandler(void)
 	DMA2_Stream5->CR	|= (uint32_t) DMA_SxCR_EN;			// Recv
 }
 
-#ifdef DMA_RECEPTION
+void TIM5_IRQHandler(void)
+{
+	TIM5->SR			 = (uint16_t) ~(TIM_IT_Update);		// Clear Timer Trigger interrupt
+	if(GPIOD->ODR & GPIO_Pin_13)
+    	GPIOD->BSRRH = GPIO_Pin_13;
+    else
+    	GPIOD->BSRRL = GPIO_Pin_13;
+}
 
 volatile uint32_t *from, *to;
+
+void DMA1_Stream1_IRQHandler(void)
+{
+	DMA1->LIFCR = DMA_LIFCR_CTCIF1;
+}
 
 //__attribute__( (section(".data#") ) )
 void DMA2_Stream5_IRQHandler(void)
@@ -144,61 +159,6 @@ void DMA2_Stream5_IRQHandler(void)
 	DMA2_Stream5->CR |= (uint32_t)DMA_SxCR_EN;		// Recv
 }
 
-#else
-
-/*
- * Data reception - Starts timer and detects any useful command
- * Timeout?
- */
-void USART1_IRQHandler(void)
-{
-	uint32_t *from, *to;
-	comm_data[buffer][rcv_idx++] = USART1->DR;
-	TIM3->CNT = 0;
-
-	if (rcv_idx >= FRAME_SIZE) {
-
-		// Verify frame
-		if ((comm_data[buffer][0] != 0xFF) ||
-				(comm_data[buffer][8] != 0xEE) ||
-				(comm_data[buffer][9] != 0x55))
-		{
-			TIM3->CR1			|= TIM_CR1_CEN;								// Start timer
-			USART1->CR1			&= ~USART_CR1_RE;
-			GPIOD->ODR			^= GPIO_Pin_12;
-			return;
-		}
-
-
-		if (comm_data[buffer][3] > SLAVE_QTY)
-			comm_data[buffer][3] = SLAVE_QTY;
-
-		to = (uint32_t*) (&comm_data[buffer][comm_data[buffer][3]*10]);
-		from   = (uint32_t*) (&values[comm_data[buffer][1]]);
-		*(to++) = *from;
-		*(from++) = 0xFFFFFFFF;
-		*(to++) = *from;
-		*(from++) = 0xFFFFFFFF;
-		*((uint16_t*) to) = *((uint16_t*) from);
-		*((uint16_t*) from) = 0xFFFF;
-
-		comm_data[buffer][3]++;
-
-		if (comm_data[buffer][1] == 0xFF)
-			GPIOD->ODR			^= GPIO_Pin_15;
-		//snd_state = buffer + 1;
-		DMA2_Stream7->NDTR		= (uint32_t) FRAME_SIZE;
-		DMA2_Stream7->M0AR		= (uint32_t) comm_data[buffer];
-		DMA2_Stream7->CR		|= (uint32_t)DMA_SxCR_EN;		// Send
-
-		rcv_idx = 0;
-		buffer = 1 - buffer;
-	}
-
-
-}
-
-#endif
 
 // DMA Send
 __attribute__( (section(".data#") ) ) void DMA2_Stream7_IRQHandler(void) {

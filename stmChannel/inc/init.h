@@ -17,5 +17,6 @@ void InitDMA(void);
 void InitExtInterrupt(void);
 void InitSyncTimer(void);
 void InitTimeout(void);
+void InitDataAvailableTimer(void);
 
 #endif /* INIT_H_ */

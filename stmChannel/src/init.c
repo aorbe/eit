@@ -14,6 +14,7 @@ extern volatile uint8_t comm_data[SIZE_RCV_BUFFER][FRAME_SIZE];
 
 DMA_InitTypeDef   	DMA_SendStructure;
 DMA_InitTypeDef  	DMA_RecvStructure;
+DMA_InitTypeDef  	DMA_DataStructure;
 EXTI_InitTypeDef   	EXTI_InitStructure;
 
 void config()
@@ -27,11 +28,10 @@ void config()
 	InitDMA();					// Communication uses DMA
 	InitTimeout();				// Communication timeout
 	InitSyncTimer();			// Counting of cycles
-	InitExtInterrupt();			// DAV and Sync Interrupts
-
-#ifdef DMA_RECEPTION
+	//InitExtInterrupt();			// DAV and Sync Interrupts
 	DMA2_Stream5->CR		|= DMA_SxCR_EN;		// Recv
-#endif
+
+	InitDataAvailableTimer();
 
 }
 
@@ -62,12 +62,13 @@ void BasicIO_Config()
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_UP;
 	GPIO_Init(GPIOE, &GPIO_InitStructure);
 
-	/* Configure PA01 (DAV) as input  */
+	/* Configure PA01 (DAV) as TIM5_TI1  */
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_1;
-	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Mode	= GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed	= GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd	= GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_TIM5);
 
 	/* Configure PA03 (OTR) as input  */
 	GPIO_InitStructure.GPIO_Pin		= GPIO_Pin_3;
@@ -133,10 +134,9 @@ void InitExtInterrupt()
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
-
 }
 
-/* Config Timer 3
+/* Config TIM3
  *
  * Single interrupt after timer expired
  * Timer is enabled after sending
@@ -170,6 +170,68 @@ void InitTimeout()
 	//TIM_Cmd(TIM3, ENABLE);
 
 }
+
+/* Config TIM5
+ * DMA1 Stream1 Channel 6
+ */
+void InitDataAvailableTimer()
+{
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+	NVIC_InitTypeDef   	NVIC_InitStructure;
+
+	/* Time base configuration */
+	/* External clock counter
+	 */
+	TIM_TimeBaseStructure.TIM_Period		= 16800; //
+	TIM_TimeBaseStructure.TIM_Prescaler		= 2000; //
+	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+
+	//TIM_TIxExternalClockConfig(TIM5, TIM_TIxExternalCLK1Source_TI2, TIM_ICPolarity_Rising, 0x00);
+	//TIM_Cmd(TIM5, ENABLE);
+
+	/* Enable DMA1 Stream 1 Interrupt */
+	NVIC_InitStructure.NVIC_IRQChannel						= DMA1_Stream1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 1;
+	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	DMA_DataStructure.DMA_Channel					= DMA_Channel_6;
+	DMA_DataStructure.DMA_DIR						= DMA_DIR_PeripheralToMemory; // Reveiving
+	DMA_DataStructure.DMA_Memory0BaseAddr			= (uint32_t)data[0];
+	DMA_DataStructure.DMA_MemoryInc					= DMA_MemoryInc_Enable;
+	DMA_DataStructure.DMA_BufferSize				= FRAME_SIZE;
+	DMA_DataStructure.DMA_PeripheralBaseAddr		= (uint32_t)&GPIOE->IDR;
+	DMA_DataStructure.DMA_PeripheralInc				= DMA_PeripheralInc_Disable;
+
+	DMA_DataStructure.DMA_PeripheralDataSize		= DMA_PeripheralDataSize_Word;
+	DMA_DataStructure.DMA_MemoryDataSize			= DMA_MemoryDataSize_Word;
+
+	DMA_DataStructure.DMA_Mode						= DMA_Mode_Normal;
+	DMA_DataStructure.DMA_Priority					= DMA_Priority_High;
+	DMA_DataStructure.DMA_FIFOMode					= DMA_FIFOMode_Disable;
+	DMA_DataStructure.DMA_FIFOThreshold				= DMA_FIFOThreshold_Full;
+	DMA_DataStructure.DMA_MemoryBurst				= DMA_MemoryBurst_Single;
+	DMA_DataStructure.DMA_PeripheralBurst			= DMA_PeripheralBurst_Single;
+
+	DMA_DeInit(DMA1_Stream1);
+	//DMA_Init(DMA1_Stream1, &DMA_RecvStructure);
+	//DMA_ClearITPendingBit(DMA1_Stream1, DMA_IT_TCIF1);
+	//DMA_ITConfig(DMA1_Stream1, DMA_IT_TC, ENABLE);
+
+	NVIC_InitStructure.NVIC_IRQChannel						= TIM5_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 1;
+	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+	//TIM_DMACmd(TIM5, TIM_DMA_Trigger, ENABLE);
+	TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+	TIM_Cmd(TIM5, ENABLE);
+
+}
+
 
 // SyncTimer is TIM8
 // which counter value (0-255) is used as sample identifier
@@ -226,46 +288,34 @@ void InitUSART()
 	USART_InitTypeDef	USART_InitStructure;
 	NVIC_InitTypeDef   	NVIC_InitStructure;
 
-#ifndef DMA_RECEPTION
-	NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
-#endif
-
 	USART_OverSampling8Cmd(USART1, ENABLE);		// Normally is 16
 	USART_StructInit(&USART_InitStructure);
 	USART_InitStructure.USART_BaudRate = SERIAL_BAUD;
 	USART_Init(USART1, &USART_InitStructure);
 
-#ifndef DMA_RECEPTION
-	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
-#endif
 	USART_Cmd(USART1, ENABLE);
 }
 
-
-// DMA Channel and number are related to internal peripherical (UART1) used
+// DMA Channel and number are related to internal perfi (UART1) used
+// DMA2 Stream5 Channel 4 - USART1_RX
+// DMA2 Stream7 Channel 4 - USART1_TX
 void InitDMA()
 {
 	NVIC_InitTypeDef   	NVIC_InitStructure;
 
 	/* Enable DMA2 Stream 7 Interrupt */
-	/*NVIC_InitStructure.NVIC_IRQChannel						= DMA2_Stream7_IRQn;
+	/*NVIC_InitStructure.NVIC_IRQChannel					= DMA2_Stream7_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 2;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 2;
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
 	NVIC_Init(&NVIC_InitStructure);*/
 
-#ifdef DMA_RECEPTION
 	/* Enable DMA2 Stream 5 Interrupt */
 	NVIC_InitStructure.NVIC_IRQChannel						= DMA2_Stream5_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority	= 1;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority			= 1;
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
-#endif
 
 	DMA_SendStructure.DMA_Channel					= DMA_Channel_4;
 	DMA_SendStructure.DMA_DIR						= DMA_DIR_MemoryToPeripheral; // Sending
@@ -285,7 +335,6 @@ void InitDMA()
 	DMA_SendStructure.DMA_MemoryBurst				= DMA_MemoryBurst_Single;
 	DMA_SendStructure.DMA_PeripheralBurst			= DMA_PeripheralBurst_Single;
 
-#ifdef DMA_RECEPTION
 	DMA_RecvStructure.DMA_Channel					= DMA_Channel_4;
 	DMA_RecvStructure.DMA_DIR						= DMA_DIR_PeripheralToMemory; // Reveiving
 	DMA_RecvStructure.DMA_Memory0BaseAddr			= (uint32_t)comm_data[0];
@@ -303,24 +352,17 @@ void InitDMA()
 	DMA_RecvStructure.DMA_FIFOThreshold				= DMA_FIFOThreshold_Full;
 	DMA_RecvStructure.DMA_MemoryBurst				= DMA_MemoryBurst_Single;
 	DMA_RecvStructure.DMA_PeripheralBurst			= DMA_PeripheralBurst_Single;
-#endif
 
 	DMA_DeInit(DMA2_Stream7);
 	DMA_Init(DMA2_Stream7, &DMA_SendStructure);
 	//DMA_ITConfig(DMA2_Stream7, DMA_IT_TC, ENABLE);
 
-#ifdef DMA_RECEPTION
 	DMA_DeInit(DMA2_Stream5);
 	DMA_Init(DMA2_Stream5, &DMA_RecvStructure);
 	DMA_ClearITPendingBit(DMA2_Stream5, DMA_IT_TCIF5);
 	DMA_ITConfig(DMA2_Stream5, DMA_IT_TC, ENABLE);
-#endif
 
-#ifdef DMA_RECEPTION
 	USART_DMACmd(USART1, USART_DMAReq_Tx | USART_DMAReq_Rx, ENABLE);
-#else
-	USART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);
-#endif
 
 	DMA_Cmd(DMA2_Stream7, DISABLE);
 

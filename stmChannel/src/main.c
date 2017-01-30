@@ -79,13 +79,14 @@ __attribute__( (section(".data#") ) ) void demodula()
  */
 int main(void) {
 
-	RCC_AHB1PeriphClockCmd(	RCC_AHB1Periph_DMA2 |
+	RCC_AHB1PeriphClockCmd(	RCC_AHB1Periph_DMA1   |
+							RCC_AHB1Periph_DMA2 |
 							RCC_AHB1Periph_GPIOA  |
 							RCC_AHB1Periph_GPIOB  |
 							RCC_AHB1Periph_GPIOC  |
 							RCC_AHB1Periph_GPIOD  |
 							RCC_AHB1Periph_GPIOE, ENABLE);
-	RCC_APB1PeriphClockCmd(	RCC_APB1Periph_TIM3, ENABLE);
+	RCC_APB1PeriphClockCmd(	RCC_APB1Periph_TIM3 | RCC_APB1Periph_TIM5, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG | RCC_APB2Periph_TIM8 | RCC_APB2Periph_USART1, ENABLE);
 
 	sdata = data;
