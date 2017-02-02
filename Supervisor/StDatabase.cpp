@@ -115,11 +115,11 @@ bool StDatabase::InsertData(unsigned char *recvData, unsigned int size, unsigned
         }
 
         // Packet Size 20488. So 128 frames or 640 values.
-        for(unsigned item=0; item<(size-8)/160; item++)
+        for(unsigned item=0; item<(size-8)/80; item++)
         {
-            memcpy((void *)data, &recvData[item*160+6], 160);
+            memcpy((void *)data, &recvData[item*80+6], 80);
             // 16 nodes per frame
-            for(unsigned int node=0; node<16; node++)
+            for(unsigned int node=0; node<8; node++)
             {
                 // 5 values per frame. So 1250 within two packets
                 for(unsigned int x=0; x<5; x++)

@@ -64,12 +64,13 @@ void ProtBasicBus::disable()
 // -203
 // -204
 
+#define EXPECTED_SIZE 10248 // was 20488
 
 int ProtBasicBus::read(unsigned int *id)
 {
     int r, i, state = 0;
     static unsigned int count = 0;
-    unsigned int expected_size = 20488;
+    unsigned int expected_size = EXPECTED_SIZE;
 
     r = _comm->recv(&recvData[rcv_size], expected_size - rcv_size);
 
@@ -118,7 +119,7 @@ int ProtBasicBus::read(unsigned int *id)
         expected_size = 4;
         break;
     case 0x05:
-        expected_size = 20488;
+        expected_size = EXPECTED_SIZE;
         break;
     default:
         memShift(0);
@@ -189,9 +190,9 @@ int ProtBasicBus::read(unsigned int *id)
         if (recvData[2] == 0x00)
         {
             // Normal Mode
-            storage.InsertData(recvData, expected_size, 16, id, 0x01);
+            storage.InsertData(recvData, expected_size, 8, id, 0x01);
 
-            count = count + (expected_size - 8)/160;
+            count = count + (expected_size - 8)/80;
 
             if (count > 4095)
             {
@@ -208,7 +209,7 @@ int ProtBasicBus::read(unsigned int *id)
 
                     elapsed = (wxGetLocalTimeMillis() - start).ToDouble();
                     start = wxGetLocalTimeMillis();
-                    speed = (4096.0 * 160.0) / elapsed;
+                    speed = (4096.0 * 80.0) / elapsed;
                     frames = (4096.0 * 1000.0/ 32.0) / elapsed;
                     printf("\n%f ms Speed:%5.2f Kb/s %5.2f frames/s\n", elapsed, speed, frames);
                     //wxString resumo;
@@ -225,7 +226,7 @@ int ProtBasicBus::read(unsigned int *id)
         else
         {
             // Debug Mode
-            storage.InsertData(recvData, expected_size, 16, id, 0x02);
+            storage.InsertData(recvData, expected_size, 8, id, 0x02);
             //printf("ID %04X\n", ((unsigned int)recvData[3])+((unsigned int)recvData[4])*256);
 //            if(monitor == NULL)
 //            {

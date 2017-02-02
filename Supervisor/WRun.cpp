@@ -52,8 +52,8 @@ void WRun::OnTimer(wxTimerEvent &event)
 {
     for(unsigned x=0; x<8; x++)
     {
-        amp[x*2]->SetValue(wxString::Format(wxT("%5.2f mV"), 0.92115*2000.0/32768.0/1020.0*cabs(src->getData().values[x])));
-        amp[x*2+1]->SetValue(wxString::Format(wxT("%5.2f rad"), carg(src->getData().values[x])));
+        amp[x*2]->SetValue(wxString::Format(wxT("%5.2f mV"), 0.92115*2000.0/32768.0/1020.0*abs(src->getData().values[x])));
+        amp[x*2+1]->SetValue(wxString::Format(wxT("%5.2f rad"), arg(src->getData().values[x])));
 
     }
     SetStatusText(wxString::Format(wxT("Reading %05d"), src->getData().id));

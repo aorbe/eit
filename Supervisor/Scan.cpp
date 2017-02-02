@@ -148,7 +148,7 @@ Scan::ExitCode Scan::Entry()
         // Connection lost - By now give up
         if (ret_value < 0)
         {
-            printf("SCAN Error %d\n", ret_value);
+            //printf("SCAN Error %d\n", ret_value);
             this->Sleep(0);
             if (ret_value == -2)
             {

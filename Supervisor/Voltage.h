@@ -13,7 +13,7 @@ class Voltage {
     public:
     int type;
     unsigned int id;
-    complex values[32];
+    std::complex<double> values[32];
     short amplitude[32][1280];
 };
 

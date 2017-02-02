@@ -12,7 +12,6 @@ volatile uint8_t running 		= 0;
 volatile uint8_t next_bank 		= 0;									// bank been used
 volatile uint8_t override_1		= 0;									// byte overwrite by CRC
 volatile uint8_t override_2		= 0;									// byte overwrite by CRC
-volatile uint16_t comm_toggle   = 0;
 volatile uint16_t next_idx 		= 0;
 extern volatile uint8_t tx_data[FRAME_SIZE];							// send data. Fix format
 volatile uint8_t USB_buffer[USB_NUM_BUFFERS][USB_BUFFER_SIZE];			// Reception buffer
@@ -75,13 +74,13 @@ void DMA2_Stream5_IRQHandler(void)
 	{
 		TIM2->CR1			|= TIM_CR1_CEN;										// Start timer
 		USART1->CR1			&= ~USART_CR1_RE;
-		GPIOD->BSRRL		= GPIO_Pin_14;								// Blink LED 14 (Invalid Reception)
+		GPIOD->BSRRL		= GPIO_Pin_13;								// Blink LED 14 (Invalid Reception)
 		return;
 	}
 	idx 	= (uint16_t *) &USB_buffer[next_bank][control+1];			// Frame code -> idx
 	if (*idx == next_idx)												// Packet OK
 	{
-		GPIOD->BSRRH		= GPIO_Pin_14;
+		GPIOD->BSRRH		= GPIO_Pin_14 | GPIO_Pin_13;
 		if (*idx & 0xFF == 0xFF)
 			GPIOD->ODR ^= GPIO_Pin_12;
 		if (*idx != 0xFFFF)
@@ -121,11 +120,11 @@ void DMA2_Stream5_IRQHandler(void)
 	{
 		// Retransmission
 		GPIOD->BSRRL		= GPIO_Pin_14;								// Blink LED 14 (Reception Error)
-		idx = (uint16_t *) &tx_data[1];							// Frame code -> idx
-		if (next_idx)
-			*idx = next_idx - 1;
-		else
-			*idx = 0xFFFF;
+		//idx = (uint16_t *) &tx_data[1];							// Frame code -> idx
+		//if (next_idx)
+		//	*idx = next_idx - 1;
+		//else
+		//	*idx = 0xFFFF;
 	}
 	DMA2_Stream5->M0AR	 = (uint32_t)&USB_buffer[next_bank][control];		// Define buffer for reception
 	DMA2_Stream5->CR	|= (uint32_t)DMA_SxCR_EN;							// Enable Receiving DMA
@@ -150,15 +149,9 @@ void TIM2_IRQHandler(void)
   * @param  None
   * @retval None
   */
-__attribute__( (section(".data#") ) ) void TIM8_UP_TIM13_IRQHandler(void)
+__attribute__( (section(".data#") ) ) void TIM5_IRQHandler(void)
 {
-	TIM8->SR		= (uint16_t)~TIM_IT_Update;							// Clear interrupt
-	if(comm_toggle) {
-		comm_toggle--;
-		return;
-	}
-	//comm_toggle = tx_data[4]?1024:1;
-	comm_toggle = 1;
+	TIM5->SR		= (uint16_t)~TIM_IT_Update;							// Clear interrupt
 	uint16_t* idx 	= (uint16_t *) &tx_data[1];							// Frame code -> idx
 
 #ifdef _SIMULATION

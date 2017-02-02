@@ -21,7 +21,7 @@
  * Initialization
  * main.c - tx_data is filled (Supervision protocol header - 10 bytes)
  * init.c - MCU pheripericals initialization
- * 			DMA2 Stream 5/7 for receive and send throught UART
+ * 			DMA2 Stream 5/7 for receive and send by UART
  * 			UART configuration
  * 			TIM8, TIM4 for syncronization
  * 			TIM2 for communication timeout
@@ -121,8 +121,8 @@ int main(void) {
 	memset(tx_data, 0x00, FRAME_SIZE);
 	// Header
 	tx_data[0] = 0xFF;
-	tx_data[1] = 0x00;	// ID High Byte
-	tx_data[2] = 0x00;	// ID Low Byte
+	tx_data[1] = 0xFF;	// ID High Byte
+	tx_data[2] = 0xFF;	// ID Low Byte
 	tx_data[3] = 0x01;	// Hop Number
 	MODE	   = 0x00;	// Mode
 	tx_data[5] = 0x00;	// Parameter
@@ -134,7 +134,7 @@ int main(void) {
 	while (1)
 	{
 		// PENSAR
-		if((tx_data[4] || (TIM4->CNT == 127))  && (running & 0x01))
+		if((tx_data[4] || (TIM3->CNT == 127))  && (running & 0x01))
 		{
 			tx_data[1] = 0x00;
 			tx_data[2] = 0x00;

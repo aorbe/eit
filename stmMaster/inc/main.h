@@ -16,8 +16,8 @@
 
 #define CAPTURE_LEN			1020
 
-#define SERIAL_BAUD			10500000
-#define SLAVE_QTY			9
+#define SERIAL_BAUD			5250000
+#define SLAVE_QTY			8
 
 #define SIZE_RCV_BUFFER		32
 #define SIZE_SND_BUFFER		12

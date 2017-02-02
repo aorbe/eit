@@ -34,7 +34,7 @@ public:
         int type;
         union
         {
-            complex e[32];
+            std::complex<double> e[32];
             short m[32][256*5];
         };
 

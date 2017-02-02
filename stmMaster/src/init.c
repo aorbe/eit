@@ -49,7 +49,7 @@ void config(void)
 	InitDMA();
 	USART_DMACmd(USART1, USART_DMAReq_Tx | USART_DMAReq_Rx, ENABLE);
 
-	InitTIM2();		// USART Timeout
+	InitTIM3();		// USART Timeout
 #endif
 	InitSyncTimer();
 }
@@ -95,7 +95,7 @@ void BasicIO_Config(void)
 	GPIO_InitStructureOC.GPIO_OType			= GPIO_OType_PP;
 	GPIO_InitStructureOC.GPIO_PuPd			= GPIO_PuPd_UP;
 	GPIO_Init(GPIOC, &GPIO_InitStructureOC);
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM3);
 
 	// Tx Pin - PB6
 	GPIO_InitStructureUSART.GPIO_Pin	= GPIO_Pin_6;
@@ -121,7 +121,7 @@ void BasicIO_Config(void)
 // Single interrupt after timer expired
 // Timer is enabled after sending
 // Shoud be 1/BaudRate * 10 * PacketSize * 1.02 (tolerance for jitter and processing delays)
-void InitTIM2()
+void InitTIM3()
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 	NVIC_InitTypeDef   		NVIC_InitStructure;
@@ -133,7 +133,7 @@ void InitTIM2()
 	NVIC_InitStructure.NVIC_IRQChannelCmd					= ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	/* TIM2 clock enable */
+	/* TIM3 clock enable */
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
 	/* Time base configuration */
@@ -156,61 +156,89 @@ void InitSyncTimer()
 	TIM_BDTRInitTypeDef		TIM_InitStructureBDTR;
 	NVIC_InitTypeDef   		NVIC_InitStructure;
 
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3 | RCC_APB1Periph_TIM4 | RCC_APB1Periph_TIM5, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
+	TIM_Cmd(TIM3, DISABLE);
 	TIM_Cmd(TIM4, DISABLE);
+	TIM_Cmd(TIM5, DISABLE);
 	TIM_Cmd(TIM8, DISABLE);
 
-	/* Enable the TIM8 global Interrupt */
-	NVIC_InitStructure.NVIC_IRQChannel 						= TIM8_UP_TIM13_IRQn;
+	/* TIM5 Update - Communication Trigger */
+	NVIC_InitStructure.NVIC_IRQChannel 						= TIM5_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority 	= 1;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority 			= 1;
 	NVIC_InitStructure.NVIC_IRQChannelCmd 					= ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
-	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period 		= 38;				// Counts until interrupt generation 125/1.6 / 2 (Toogle) -> 38 (Run Mode)
+	/* TIM8 - Receive clock from main generator */
+	// TESTING:
+	TIM_TimeBaseStructure.TIM_Period 		= 12;				// Counts until interrupt generation 125/1.6 / 2 (Toogle) -> 38 (Run Mode)
+	//TIM_TimeBaseStructure.TIM_Period 		= 17499;				// Counts until interrupt generation 125/1.6 / 2 (Toogle) -> 38 (Run Mode)
 	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				// This is changed for calibration from 0 to 1023
-	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
+	TIM_TimeBaseStructure.TIM_ClockDivision	= TIM_CKD_DIV1;
 	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0000;
 	TIM_TimeBaseInit(TIM8, &TIM_TimeBaseStructure);
+	// TESTING:
 	TIM_ETRClockMode1Config(TIM8, TIM_ExtTRGPSC_OFF, TIM_ExtTRGPolarity_NonInverted, 0);
+	TIM_SelectOutputTrigger(TIM8, TIM_TRGOSource_OC1);
+	TIM_SelectMasterSlaveMode(TIM8, TIM_MasterSlaveMode_Enable);
 
-	/* Time base configuration */
-	TIM_TimeBaseStructure.TIM_Period 		= 255;				// Counts until interrupt generation
+	/* TIM5 - Communication Cycle */
+	TIM_TimeBaseStructure.TIM_Period 		= 5;				// Counts until interrupt generation
 	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				//
-	TIM_TimeBaseStructure.TIM_ClockDivision	= 0;
+	TIM_TimeBaseStructure.TIM_ClockDivision	= TIM_CKD_DIV1;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+	// TIM5 is slave of TIM8
+	TIM_SelectInputTrigger(TIM5, TIM_TS_ITR3);
+	TIM_SelectSlaveMode(TIM5, TIM_SlaveMode_External1);
+	TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+
+	/* TIM4 - Main Sync Pulse Output */
+	TIM_TimeBaseStructure.TIM_Period 		= 2;
+	TIM_TimeBaseStructure.TIM_Prescaler		= 0;
+	TIM_TimeBaseStructure.TIM_ClockDivision	= TIM_CKD_DIV1;
 	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
 	TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);
+	// TIM4 is slave of TIM8
+	TIM_SelectInputTrigger(TIM4, TIM_TS_ITR3);
+	TIM_SelectSlaveMode(TIM4, TIM_SlaveMode_External1);
+	// TIM4 outputs in PC8
+	TIM_OCStructInit(&TIM_InitStructureOC);
+	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
+	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
+	TIM_InitStructureOC.TIM_Pulse			= 1;
+	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
+	TIM_InitStructureOC.TIM_OCIdleState		= TIM_OCIdleState_Reset;
+	TIM_OC3Init(TIM4, &TIM_InitStructureOC);
+	TIM_CCxCmd(TIM4, TIM_Channel_3, TIM_CCx_Enable);
+	TIM_SelectOutputTrigger(TIM4, TIM_TRGOSource_Update);
 
+	/* TIM3 - Cycle Pulse Output */
+	TIM_TimeBaseStructure.TIM_Period 		= 255;				// Counts until interrupt generation
+	TIM_TimeBaseStructure.TIM_Prescaler		= 0;				//
+	TIM_TimeBaseStructure.TIM_ClockDivision	= TIM_CKD_DIV1;
+	TIM_TimeBaseStructure.TIM_CounterMode	= TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
+	// TIM3 is slave of TIM4
+	TIM_SelectInputTrigger(TIM3, TIM_TS_ITR3);
+	TIM_SelectSlaveMode(TIM3, TIM_SlaveMode_External1);
+	// TIM3
 	TIM_OCStructInit(&TIM_InitStructureOC);
 	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
 	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
 	TIM_InitStructureOC.TIM_Pulse			= 127;
 	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
-	TIM_InitStructureOC.TIM_OCIdleState		= TIM_OCIdleState_Reset;
-	TIM_OC3Init(TIM4, &TIM_InitStructureOC);
-	TIM_CCxCmd(TIM4, TIM_Channel_3, TIM_CCx_Enable);
+	TIM_OC1Init(TIM3, &TIM_InitStructureOC);
+	TIM_CCxCmd(TIM3, TIM_Channel_1, TIM_CCx_Enable);
+	TIM_CtrlPWMOutputs(TIM3, ENABLE);
 
-	TIM_OCStructInit(&TIM_InitStructureOC);
-	TIM_InitStructureOC.TIM_OCMode			= TIM_OCMode_Toggle;
-	TIM_InitStructureOC.TIM_OutputState		= TIM_OutputState_Enable;
-	TIM_InitStructureOC.TIM_Pulse			= 35;
-	TIM_InitStructureOC.TIM_OCPolarity		= TIM_OCPolarity_Low;
-	TIM_OC1Init(TIM8, &TIM_InitStructureOC);
-	TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Enable);
-	TIM_CtrlPWMOutputs(TIM8, ENABLE);
 
-	TIM_SelectOutputTrigger(TIM8, TIM_TRGOSource_OC1);
-	TIM_SelectMasterSlaveMode(TIM8, TIM_MasterSlaveMode_Enable);
 
-	TIM_SelectInputTrigger(TIM4, TIM_TS_ITR3);
-	TIM_SelectSlaveMode(TIM4, TIM_SlaveMode_External1);
-
-	TIM_ITConfig(TIM8, TIM_IT_Update, ENABLE);
-
+	TIM_Cmd(TIM3, ENABLE);
 	TIM_Cmd(TIM4, ENABLE);
+	TIM_Cmd(TIM5, ENABLE);
 	TIM_Cmd(TIM8, ENABLE);
 }
 

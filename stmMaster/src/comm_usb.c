@@ -330,12 +330,12 @@ static uint8_t  usbd_cdc_DataOut (void *pdev, uint8_t epnum)
 
 					if (APP_Rx_Buffer[2])
 					{
-						TIM8->PSC = 127;				// Calibration
+						TIM4->PSC = 127;				// Calibration
 						tx_data[4] = 0x01;
 					}
 					else
 					{
-						TIM8->PSC	= 0;				// Normal operation
+						TIM4->PSC	= 0;				// Normal operation
 						tx_data[4] 	= 0x00;
 					}
 					running = 0x01;

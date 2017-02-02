@@ -63,6 +63,10 @@ Voltage Record::addData(unsigned char *recvData, unsigned int num_electrode, uns
         }
 //        printf("Amplitude %06d %f %f mV\n", *idx, sqrt(pow(data[pos][0].value.real,2) + (pow(data[pos][0].value.imag,2)))*2000/32768.0/1020,
 //               sqrt(pow(data[pos][1].value.real,2) + (pow(data[pos][1].value.imag,2)))*2000/32768.0/1020);
+        if (data[pos][0].b[0] == 0xFF && data[pos][0].b[1] == 0xFF && data[pos][0].b[2] == 0xFF && data[pos][0].b[3] == 0xFF)
+        {
+            printf("Erro %04X Channel 0\n", *idx);
+        }
         pos++;
         *idx = (*idx + 1) % 65536;
     }

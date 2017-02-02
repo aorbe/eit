@@ -10,13 +10,9 @@
 
 #undef _SIMULATION
 
-#define DMA_RECEPTION
-#undef DMA_CAPTURE
-
-
 #define CAPTURE_LEN			1020
 
-#define SERIAL_BAUD			10500000
+#define SERIAL_BAUD			5250000
 #define SLAVE_QTY			8
 
 #define SIZE_RCV_BUFFER		32
