@@ -26,7 +26,7 @@ for row in cur.execute("SELECT ts, dataTable FROM CONTROL;"):
 	nUsed, nTable = row[1].split('MEASURE')
 	tables.append([int(nTable), time.strftime('%d %b %Y %H:%M:%S +0000',time.gmtime(row[0]))])
 nTables = len(tables)
-print 'Quantidade de tabelas= %d'%nTables
+print ('Quantidade de tabelas= %d' %nTables)
 
 
 while(runFlag):
@@ -35,7 +35,7 @@ while(runFlag):
 		query = 'SELECT COUNT(*) FROM MEASURE%010d;'%idx
 		cur.execute(query)
 		lenTable = cur.fetchone();
-		print '%d. Table MEASURE%010d has %d records (%s)' % (idx, idx, lenTable[0], tTable)
+		print ('%d. Table MEASURE%010d has %d records (%s)' % (idx, idx, lenTable[0], tTable))
 
 	# Selecionando uma tabela e obtendo seus valores
 	sel = input('Selecione uma opcao: ')
@@ -83,7 +83,7 @@ while(runFlag):
 	#	print(row)
 	print('Ordenados: %d'%(len(tr_order)))
 	d = []
-	fExport = open('/home/asantos/export.csv', 'w')
+	fExport = open('/home/alsantos/export.csv', 'w')
 	for row in tr_order:
 		for res in result[row[0][0]:row[1][0]]:
 			d.append(res)
@@ -100,7 +100,7 @@ while(runFlag):
 
 	for nEletrodo in range(1,9):
 		amp = np.square(np.add(np.multiply(v[:,nEletrodo*3-1],v[:,nEletrodo*3-1]), np.multiply(v[:,nEletrodo*3],v[:,nEletrodo*3-1])))
-		print 'Media=%8.4e\tMax=%8.4e\tMin=%8.4e'%(np.mean(amp),np.max(amp),np.min(amp))
+		print ('Media=%8.4e\tMax=%8.4e\tMin=%8.4e'%(np.mean(amp),np.max(amp),np.min(amp)))
 
 	n_graph = 0
 

@@ -23,7 +23,7 @@
  * init.c - MCU pheripericals initialization
  * 			DMA2 Stream 5/7 for receive and send by UART
  * 			UART configuration
- * 			TIM8, TIM4 for syncronization
+ * 			TIM8, TIM4 for synchronization
  * 			TIM2 for communication timeout
  * 			TIM6 for send period
  *
@@ -91,7 +91,7 @@ extern volatile uint8_t running;
 volatile uint8_t tx_data[FRAME_SIZE];									// send data. Fix format
 
 uint8_t contador				= 0;									// Temporary structure
-uint16_t i, j, k;														// Auxiliary variables (mainly, loops)
+uint16_t i, j, k;														// Auxiliary variables (mainly loops)
 
 /* Private function prototypes -----------------------------------------------*/
 void crc(uint8_t* buffer, uint16_t size);
